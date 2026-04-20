@@ -1,0 +1,161 @@
+#!/bin/sh
+# coldbrew rc.local — runs at end of boot. Do NOT use `set -e`: a single
+# failure (e.g. dhclient before association) must not skip the rest.
+# All output goes to /var/log/rc-local.log so we can see what happened.
+exec >/var/log/rc-local.log 2>&1
+set -x
+echo "=== rc.local start: $(date) ==="
+
+# Replace with your own ssh public key — the contents of ~/.ssh/id_rsa.pub
+# (or id_ed25519.pub) from the machine you want to SSH from. Leave blank to
+# skip authorized_keys installation on boot.
+PUBKEY="ssh-rsa REPLACE_WITH_YOUR_PUBLIC_KEY user@host"
+
+# Kill NetworkManager first — it fights rc.local's manual wpa_supplicant on
+# the Ralink RT3290 driver and leaves the interface wedged.
+service network-manager stop 2>/dev/null || true
+pkill -9 -f NetworkManager 2>/dev/null || true
+
+# Reset known-good passwords on every boot — 12.04 factory hash silently
+# drifts on some reboots. Both accounts so either is always usable.
+echo 'expresso:expresso' | chpasswd || true
+echo 'coldbrew:coldbrew' | chpasswd || true
+
+# Suppress noisy default MOTD scripts; keep only our custom one.
+for f in /etc/update-motd.d/00-header /etc/update-motd.d/10-help-text \
+          /etc/update-motd.d/50-landscape-sysinfo /etc/update-motd.d/90-updates-available \
+          /etc/update-motd.d/91-release-upgrade /etc/update-motd.d/98-reboot-required; do
+    [ -f "$f" ] && chmod -x "$f"
+done
+
+for user in expresso coldbrew; do
+    home="/home/$user"
+    [ -d "$home" ] || continue
+    mkdir -p "$home/.ssh"
+    echo "$PUBKEY" > "$home/.ssh/authorized_keys"
+    chmod 700 "$home/.ssh"
+    chmod 600 "$home/.ssh/authorized_keys"
+    chown -R "$user:$user" "$home/.ssh"
+done
+
+# WiFi: wait for Ralink driver, clear any stale wpa_supplicant/dhclient,
+# then associate. No -D driver hint — auto-select works; nl80211 does not.
+if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+    i=0
+    while [ $i -lt 15 ]; do
+        ip link show wlan0 >/dev/null 2>&1 && break
+        sleep 2
+        i=$((i+1))
+    done
+
+    pkill -9 -f 'wpa_supplicant.*wlan0' 2>/dev/null || true
+    pkill -9 -f 'dhclient.*wlan0'        2>/dev/null || true
+    rm -f /var/run/wpa_supplicant/wlan0 /var/run/wpa_supplicant.wlan0.pid
+    sleep 1
+
+    ifconfig wlan0 up 2>/dev/null || true
+
+    wpa_supplicant -B -i wlan0 \
+        -c /etc/wpa_supplicant/wpa_supplicant.conf \
+        -P /var/run/wpa_supplicant.wlan0.pid
+
+    # Wait up to 20s for association before asking for DHCP.
+    j=0
+    while [ $j -lt 10 ]; do
+        if iwconfig wlan0 2>/dev/null | grep -q 'Access Point: [0-9A-F]'; then
+            break
+        fi
+        sleep 2
+        j=$((j+1))
+    done
+
+    # -1 = single attempt with default 60s timeout; avoid a second foreground
+    # call that could hang rc.local indefinitely.
+    dhclient -1 -v wlan0 || true
+fi
+
+# Final status summary — makes post-boot verification trivial.
+echo "=== status ==="
+echo "-- wlan0 --"
+ip -o -4 addr show wlan0 2>/dev/null || echo "wlan0 has no IPv4"
+iwconfig wlan0 2>/dev/null | grep -E 'ESSID|Access Point' || true
+echo "-- processes --"
+ps -eo pid,cmd | grep -E 'wpa_supplicant|fake-server|NetworkManager' | grep -v 'grep -E' || echo "none running"
+echo "-- authorized_keys --"
+for u in expresso coldbrew; do
+    f=/home/$u/.ssh/authorized_keys
+    if [ -f "$f" ]; then
+        echo "$f: $(stat -c '%U:%G %a %s bytes' "$f")"
+    else
+        echo "$f: MISSING"
+    fi
+done
+
+# GlobalFunctions.lua integrity check: if the active file lost our
+# 'Coldbrew unlocks' marker (manual reinstall, etc.) restore from the
+# golden snapshot that bike-sync.sh push refreshes.
+GF_ACTIVE=/usr/local/expresso/20180514001/ME_Assets/Scripts/GlobalFunctions.lua
+GF_GOLDEN=/usr/local/expresso/coldbrew/GlobalFunctions.lua.golden
+if [ -f "$GF_GOLDEN" ] && [ -f "$GF_ACTIVE" ]; then
+    if ! grep -q 'Coldbrew unlocks' "$GF_ACTIVE"; then
+        cp "$GF_GOLDEN" "$GF_ACTIVE"
+        chown expresso:expresso "$GF_ACTIVE"
+        echo "restored GlobalFunctions.lua from golden"
+    fi
+fi
+
+# World unlock re-patch: idempotent sed, no-op if already patched. Defense
+# against any partial-restore of world lua files.
+for W in CityExpress Thunderball IronHorseRush SundayAfternoon MiniMayhem \
+         DragonFire Odyssey RavensRoost LostValley FalconFlight \
+         GrapeStomper RabbitRun CamelCountry; do
+    D=/usr/local/expresso/20180514001/ME_Assets/Worlds/$W
+    [ -d "$D" ] || continue
+    for f in "$D"/*.lua; do
+        [ -f "$f" ] || continue
+        if grep -q LEVEL_AVAILABILITY_BRONZE "$f" 2>/dev/null; then
+            sed -i 's/LEVEL_AVAILABILITY_BRONZE/LEVEL_AVAILABILITY_ALL/g' "$f"
+            echo "re-patched BRONZE→ALL in $f"
+        fi
+    done
+done
+
+# Version pin: if /home/expresso/.expresso_master_version or ef_global.conf
+# lose their Version=20180514001 entry, gnome-startup-custom.sh falls back
+# to a 2013 build and NONE of our Lua/world patches apply. Pin both here.
+EF_CONF=/usr/local/expresso/conf/ef_global.conf
+EF_VER_FILE=/home/expresso/.expresso_master_version
+echo "EXPRESSO_MASTER_VERSION=20180514001" > "$EF_VER_FILE"
+chown expresso:expresso "$EF_VER_FILE"
+if [ -f "$EF_CONF" ] && ! grep -q "^Version = 20180514001" "$EF_CONF"; then
+    # Restore from the golden backup rather than patching a stub in place,
+    # since the file may already be missing 20+ keys. Tracked in repo at
+    # payload/conf/ef_global.conf.orig and pushed to coldbrew/ by bike-sync.
+    for BACKUP in \
+        /usr/local/expresso/coldbrew/ef_global.conf.orig \
+        /home/expresso/backup_20260417/ef_global.conf.orig; do
+        if [ -f "$BACKUP" ]; then
+            cp "$BACKUP" "$EF_CONF"
+            chown expresso:expresso "$EF_CONF"
+            echo "restored ef_global.conf from $BACKUP"
+            break
+        fi
+    done
+fi
+
+# ef_global.conf watchdog — the game rewrites this file ~40s after boot,
+# stomping our LocationName + BikeSubscription. Upstart job at
+# /etc/init/ef-watchdog.conf runs the watchdog at runlevel 2345 and respawns
+# on exit. Kick it here in case upstart missed the event.
+initctl status ef-watchdog 2>/dev/null | grep -q 'start/running' || \
+    initctl start ef-watchdog 2>/dev/null || true
+
+# Fake-server daemon: injects login_user responses into inca_requests since
+# services.expresso.net is dead. Without it, the top-right pill shows "Guest".
+if [ -x /usr/local/bin/fake-server.sh ]; then
+    pkill -f '/usr/local/bin/fake-server.sh' 2>/dev/null || true
+    nohup /usr/local/bin/fake-server.sh >/dev/null 2>&1 &
+fi
+
+echo "=== rc.local end: $(date) ==="
+exit 0

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# xbike — run a command on the Expresso HD via SSH.
+# Tries key auth via the 'bike' alias first; falls back to sshpass with the
+# expresso:expresso password. Strips noisy post-quantum warnings from output.
+# Usage:
+#   xbike                 -- interactive shell
+#   xbike <cmd>           -- run command, stream output
+#   xbike -q <cmd>        -- suppress the post-quantum warning lines
+#   xbike --put SRC DST   -- scp SRC to DST on bike (root-owned paths ok)
+#   xbike --get SRC DST   -- scp SRC on bike to local DST
+#   xbike --root <cmd>    -- run as root via sudo (password piped)
+
+set -o pipefail
+
+BIKE_USER="${BIKE_USER:-expresso}"
+BIKE_HOST="${BIKE_HOST:-192.168.1.100}"
+BIKE_PW="${BIKE_PW:-expresso}"
+SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=8 -o LogLevel=ERROR"
+
+# Pick auth: bike alias (key) if it works on the default host, else sshpass.
+# If BIKE_HOST is overridden via env, skip the alias and go straight to sshpass.
+if [[ "$BIKE_HOST" == "192.168.1.100" ]] && ssh -o BatchMode=yes -o ConnectTimeout=4 bike "true" 2>/dev/null; then
+    SSH_CMD=(ssh bike)
+    SCP_CMD=(scp)
+    SCP_TGT="bike"
+else
+    SSH_CMD=(sshpass -p "$BIKE_PW" ssh $SSH_OPTS -o PreferredAuthentications=password -o PubkeyAuthentication=no "${BIKE_USER}@${BIKE_HOST}")
+    SCP_CMD=(sshpass -p "$BIKE_PW" scp $SSH_OPTS -o PreferredAuthentications=password -o PubkeyAuthentication=no)
+    SCP_TGT="${BIKE_USER}@${BIKE_HOST}"
+fi
+
+filter_noise() {
+    grep -vE '^\*\* (WARNING|This session|The server)' || true
+}
+
+case "${1:-}" in
+    --put)
+        shift
+        "${SCP_CMD[@]}" "$1" "$SCP_TGT:$2"
+        ;;
+    --get)
+        shift
+        "${SCP_CMD[@]}" "$SCP_TGT:$1" "$2"
+        ;;
+    --root)
+        shift
+        "${SSH_CMD[@]}" "echo '$BIKE_PW' | sudo -S bash -lc $(printf %q "$*")" 2> >(filter_noise >&2) | filter_noise
+        ;;
+    -q)
+        shift
+        "${SSH_CMD[@]}" "$@" 2> >(filter_noise >&2) | filter_noise
+        ;;
+    "")
+        "${SSH_CMD[@]}"
+        ;;
+    *)
+        "${SSH_CMD[@]}" "$@" 2> >(filter_noise >&2) | filter_noise
+        ;;
+esac

@@ -1,0 +1,43 @@
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pdm-python
+
+# --- Secrets & env ---------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+
+# --- Local agent / editor state --------------------------------------------
+.claude/
+memory/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Runtime artifacts that shouldn't leak into git ------------------------
+# backups/ holds on-bike snapshots pulled during recon.
+# results/  holds generated splash images, log scrapes, etc.
+backups/*
+!backups/.gitkeep
+results/*
+!results/.gitkeep
+
+# --- Agent scratch / notes outside the repo layout -------------------------
+agent-notes/
+.worktrees/
+.playwright-mcp/
+
+# --- OS cruft --------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# --- Build / misc ----------------------------------------------------------
+*.log
+*.bak
+*.tmp
+.ipynb_checkpoints/

@@ -1,0 +1,9 @@
+# HID key script: bootstrap Ethernet on the bike and report IP back to mule
+# Mule must be running dnsmasq on 10.42.42.1 before this script runs.
+# Placeholder {MULE_IP} substituted by orchestrator (always 10.42.42.1 for ethernet path).
+
+TYPE sudo dhclient eth0
+ENTER
+WAIT 6000
+TYPE ip -4 addr show eth0 | nc -q0 {MULE_IP} 9999
+ENTER

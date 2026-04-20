@@ -1,0 +1,13 @@
+# HID key script: open xterm via Alt+F2 GNOME run dialog
+# Format: one directive per line
+#   ALT_F2          - send Alt+F2 chord
+#   WAIT <ms>       - sleep N milliseconds
+#   TYPE <text>     - type literal text
+#   ENTER           - press Return
+#   CLEAR           - send Ctrl+A then Delete (clear run dialog if already open)
+
+ALT_F2
+WAIT 1200
+TYPE xterm
+ENTER
+WAIT 1500

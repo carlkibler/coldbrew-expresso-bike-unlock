@@ -1,0 +1,27 @@
+{
+  "build": "20180514001",
+  "inca_ver": "2015-08-12_11-42-35",
+  "expected_worlds": 60,
+  "bronze_worlds": [
+    "CityExpress",
+    "Thunderball",
+    "IronHorseRush",
+    "SundayAfternoon",
+    "MiniMayhem",
+    "DragonFire",
+    "Odyssey",
+    "RavensRoost",
+    "LostValley",
+    "FalconFlight",
+    "GrapeStomper",
+    "RabbitRun",
+    "CamelCountry"
+  ],
+  "steps": [
+    "world_availability",
+    "bike_subscription",
+    "global_functions",
+    "db_seed"
+  ],
+  "verified": true
+}

@@ -1,0 +1,47 @@
+# Example ef_global.conf showing the structure Coldbrew expects on the bike.
+# The real file lives on the bike at /usr/local/expresso/conf/ef_global.conf.
+# This is provided as a reference only; Coldbrew edits the live file in place
+# (via sed patterns in payload/unlock.sh) rather than overwriting it.
+
+BikeSubscription = 1
+BrandingID = default
+DispenserServer = http://services.expresso.net
+LanguageSetting = 0
+LastLogAttemptTime = 0
+LastLogRollTime = 0
+LastLogUploadTime = 0
+LastRebootTime = 0
+
+# LocationGUID and LocationName are bike-specific identifiers assigned by the
+# original vendor. Leave them at whatever your bike already has.
+LocationGUID = EXAMPLEGUID
+LocationName = Coldbrew
+
+LogErrorNumber = 0
+LogUploadURL = http://updates.expresso.net/log-upload.php
+MusicDownloadURL = http://updates.expresso.net/music-download.php
+MusicURL = http://updates.expresso.net/music-list.php
+PatchServerURL = http://updates.expresso.net/patch-filename.php
+
+# SerialNumber is baked into the hardware; keep your bike's real value.
+SerialNumber = HDU00000000
+
+# Steering calibration — per-bike, keep what you have.
+SteeringCalibrationCenter = 512
+SteeringCalibrationMax = 700
+SteeringCalibrationMin = 320
+
+TVAvailable = false
+TVEnabled = false
+TVStandardName = us-cable
+TimeoutUserLoginSeconds = 1
+UpdateServer = http://services.expresso.net
+UpdateServerOld = http://updates.expresso.net
+
+# Expresso release version — whichever your bike already runs.
+Version = 20180514001
+
+# WiFi credentials — the bike reads these on boot when it joins the network.
+# Leave blank here; populate the live file on the bike only.
+# WirelessSSID = your-network-name
+# WirelessPassword = your-wifi-password

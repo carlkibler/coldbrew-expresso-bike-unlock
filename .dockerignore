@@ -1,0 +1,6 @@
+backups/
+results/
+__pycache__/
+*.pyc
+.git/
+*.txt.bak

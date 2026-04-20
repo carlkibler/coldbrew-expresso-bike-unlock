@@ -1,0 +1,84 @@
+#!/bin/bash
+# Coldbrew MOTD — deployed to /etc/update-motd.d/99-coldbrew
+
+BOLD="\e[1m"; RESET="\e[0m"; GREEN="\e[32m"; RED="\e[31m"; YELLOW="\e[33m"; CYAN="\e[36m"; DIM="\e[2m"
+
+echo -e "${BOLD}${CYAN}╔══════════════════════════════════════╗"
+echo -e "║      Cold Brew — Expresso HD         ║"
+echo -e "╚══════════════════════════════════════╝${RESET}"
+
+# ── System ────────────────────────────────────────────────────────────────────
+load=$(awk '{print $1}' /proc/loadavg)
+mem_total=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+mem_free=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+mem_pct=$(( (mem_total - mem_free) * 100 / mem_total ))
+uptime_str=$(uptime -p 2>/dev/null || uptime | sed 's/.*up /up /' | cut -d, -f1)
+echo -e "\n${BOLD}System:${RESET}  load ${load}  mem ${mem_pct}%  ${DIM}${uptime_str}${RESET}"
+
+# ── Network ───────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}Network:${RESET}"
+for iface in wlan0 eth0 tailscale0; do
+    ip=$(ip addr show $iface 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1)
+    if [ -n "$ip" ]; then
+        echo -e "  ${GREEN}●${RESET} $iface  $ip"
+    else
+        state=$(ip link show $iface 2>/dev/null | grep -o 'state [A-Z]*' | awk '{print $2}')
+        [ -n "$state" ] && echo -e "  ${RED}○${RESET} $iface  ($state)"
+    fi
+done
+
+# ── Game status ───────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}Game:${RESET}"
+for proc in Launcher Inca Dispenser; do
+    if pgrep -x "$proc" >/dev/null 2>&1; then
+        echo -e "  ${GREEN}●${RESET} $proc running"
+    else
+        echo -e "  ${RED}○${RESET} $proc stopped"
+    fi
+done
+
+# ── Unlock status ─────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}Cold Brew unlock:${RESET}"
+APPDIR=/usr/local/expresso/20180514001
+
+# eLive subscription
+sub=$(grep -o 'BikeSubscription = [0-9]*' /usr/local/expresso/conf/ef_global.conf 2>/dev/null | awk '{print $3}')
+if [ "$sub" = "1" ]; then
+    echo -e "  ${GREEN}✓${RESET} eLive active (BikeSubscription=1)"
+else
+    echo -e "  ${RED}✗${RESET} eLive NOT patched (BikeSubscription=${sub:-?})"
+fi
+
+# GlobalFunctions.lua patches
+GF="$APPDIR/ME_Assets/Scripts/GlobalFunctions.lua"
+if grep -q 'GameInfo_IsLocked' "$GF" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${RESET} Lua locks bypassed (GameInfo_IsLocked, RouteGroupThreshold, UpdateChaseLockText)"
+else
+    echo -e "  ${RED}✗${RESET} Lua patches missing from GlobalFunctions.lua"
+fi
+
+# World availability
+bronze=$(grep -rl 'LEVEL_AVAILABILITY_BRONZE' "$APPDIR/ME_Assets/Worlds/" 2>/dev/null | grep -v 'cc_' | wc -l)
+if [ "$bronze" -eq 0 ]; then
+    echo -e "  ${GREEN}✓${RESET} All worlds unlocked (no LEVEL_AVAILABILITY_BRONZE)"
+else
+    echo -e "  ${YELLOW}!${RESET} $bronze world(s) still have LEVEL_AVAILABILITY_BRONZE"
+fi
+
+# rc.local boot persistence
+if grep -q 'wpa_supplicant' /etc/rc.local 2>/dev/null; then
+    echo -e "  ${GREEN}✓${RESET} rc.local: WiFi + password persistence active"
+else
+    echo -e "  ${RED}✗${RESET} rc.local missing WiFi autostart"
+fi
+
+# ── Scripts & aliases ─────────────────────────────────────────────────────────
+echo -e "\n${BOLD}Scripts (~/):${RESET}"
+for s in wifi-up.sh bike-sleep.sh bike-wake.sh coldbrew-recon.sh; do
+    [ -f "/home/expresso/$s" ] && echo -e "  ${CYAN}$s${RESET}" || echo -e "  ${RED}$s (missing)${RESET}"
+done
+
+echo -e "\n${BOLD}Aliases:${RESET}"
+echo -e "  ${CYAN}game-start  game-stop  game-restart  game-status${RESET}"
+
+echo ""

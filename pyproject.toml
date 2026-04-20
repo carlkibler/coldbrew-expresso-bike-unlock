@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "coldbrew"
+version = "0.1.0"
+description = "Expresso HD reverse engineering and auto-unlock toolkit"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+coldbrew-mule = "mule.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mule"]
+
+[tool.ruff]
+line-length = 120

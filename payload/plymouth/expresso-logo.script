@@ -1,0 +1,34 @@
+// Coldbrew plymouth splash — per-boot random rotation through 4 images.
+// Pre-generated PNGs live alongside this script in the theme dir.
+//
+// Plymouth Script language reference: Math.Random() returns [0.0, 1.0).
+
+screen_width  = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+r = Math.Random();
+if (r < 0.25) {
+    wallpaper_image = Image("splash-1.png");
+} else if (r < 0.50) {
+    wallpaper_image = Image("splash-2.png");
+} else if (r < 0.75) {
+    wallpaper_image = Image("splash-3.png");
+} else {
+    wallpaper_image = Image("splash-4.png");
+}
+
+// Aspect-correct letterbox scale.
+img_w = wallpaper_image.GetWidth();
+img_h = wallpaper_image.GetHeight();
+scale_w = screen_width  / img_w;
+scale_h = screen_height / img_h;
+scale   = scale_w;
+if (scale_h < scale_w) { scale = scale_h; }
+new_w = img_w * scale;
+new_h = img_h * scale;
+
+resized_image = wallpaper_image.Scale(new_w, new_h);
+wallpaper_sprite = Sprite(resized_image);
+wallpaper_sprite.SetX((screen_width  - new_w) / 2);
+wallpaper_sprite.SetY((screen_height - new_h) / 2);
+wallpaper_sprite.SetZ(-100);
