@@ -13,7 +13,7 @@ all stock routes unlocked, no internet or login ever required. It is _yours fore
 Notes:
 - Tested on both 2013 and 2018 software versions.
 - The bike runs Ubuntu and is easy and safe to hack on.
-- Do not be intimidated by the installer.
+- **Do not be intimidated** - it is easy and safe.
 
 > **Status:** research project. Runs on my hardware. If you try it on yours and
 > it bricks, that sucks. Contribute back if you can.
