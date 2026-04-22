@@ -7,7 +7,9 @@
 #   1. World availability: LEVEL_AVAILABILITY_BRONZE → LEVEL_AVAILABILITY_ALL (13 worlds)
 #   2. BikeSubscription = 1 in ef_global.conf
 #   3+4. Append GlobalFunctions.lua patch block (route-unlock + login-remap)
+#   4.5. Auto-skip login/welcome screens
 #   5. Seed inca_requests MySQL table (60 routes)
+#   6. Friendly in-ride ticker customization + occasional local time
 
 set -euo pipefail
 
@@ -47,6 +49,7 @@ if ! $DRY; then
   tar -czf "$BACKUP" \
     "$BASE/Worlds/"*/*.lua \
     "$BASE/Scripts/GlobalFunctions.lua" \
+    "$BASE/Scripts/Ticker.lua" \
     "$CONF" 2>/dev/null || true
   echo "BACKUP:$BACKUP"
 fi
@@ -142,6 +145,29 @@ skip_screen "$BASE/Shell/shell_welcome.lua" \
   "$SCRIPT_DIR/patches/shell_welcome_append.lua" \
   'coldbrew:autoskip-welcome' \
   'shell_welcome.lua'
+
+# ── Mechanism 6: in-ride ticker customization ─────────────────────────────────
+# Appends a small override block to Ticker.lua:
+#   - swaps dead expresso.com / leaderboard nags for friendlier local messages
+#   - turns one low-weight in-route slot into a dynamic local clock
+TICKER="$BASE/Scripts/Ticker.lua"
+TICKER_PATCH="$SCRIPT_DIR/patches/ticker_append.lua"
+TICKER_SENTINEL='coldbrew:ticker-v1'
+
+ticker_existing=$(sed -n "/-- ${TICKER_SENTINEL}/,\$p" "$TICKER" 2>/dev/null || true)
+ticker_payload=$(sed -n "/-- ${TICKER_SENTINEL}/,\$p" "$TICKER_PATCH")
+
+if [ -n "$ticker_existing" ] && [ "$ticker_existing" = "$ticker_payload" ]; then
+  log "Mechanism 6: already patched (${TICKER_SENTINEL}, up-to-date)"
+else
+  if grep -q "coldbrew:ticker-" "$TICKER" 2>/dev/null; then
+    apply "Mechanism 6: refreshing ticker customization block" \
+      "sed -i '/-- coldbrew:ticker-/,\$d' \"$TICKER\" && cat \"$TICKER_PATCH\" >> \"$TICKER\""
+  else
+    apply "Mechanism 6: appending ticker customization block" \
+      "cat \"$TICKER_PATCH\" >> \"$TICKER\""
+  fi
+fi
 
 # ── Mechanism 5: DB session patch (non-fatal; belt-and-suspenders for current session) ─
 MYSQL_CREDS=""

@@ -92,10 +92,12 @@ BUILD_DIR="$(detect_build)"
 
 BASE="$EXPRESSO_ROOT/$BUILD_DIR"
 GF="$BASE/ME_Assets/Scripts/GlobalFunctions.lua"
+TICKER="$BASE/ME_Assets/Scripts/Ticker.lua"
 WORLDS_DIR="$BASE/ME_Assets/Worlds"
 
 require_file "$CONF"
 require_file "$GF"
+require_file "$TICKER"
 [ -d "$WORLDS_DIR" ] || { echo "Missing worlds dir: $WORLDS_DIR" >&2; exit 1; }
 
 if ! $ALLOW_UNKNOWN_BUILD; then
@@ -122,6 +124,7 @@ backup_path() {
 collect_backup_items() {
   backup_path "$CONF"
   backup_path "$GF"
+  backup_path "$TICKER"
   backup_path "$BASE/ME_Assets/Shell/shell_start.lua"
   backup_path "$BASE/ME_Assets/Shell/shell_welcome.lua"
   [ -f /etc/hosts ] && backup_path /etc/hosts || true
