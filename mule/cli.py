@@ -230,14 +230,14 @@ def cmd_undo(args: argparse.Namespace) -> int:
         ["sshpass", "-p", "expresso",
          "scp", "-o", "StrictHostKeyChecking=no",
          "-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no",
-         str(undo_script), f"expresso@{ip}:/tmp/vr_undo.sh"],
+         str(undo_script), f"expresso@{ip}:/tmp/coldbrew_undo.sh"],
         check=True,
     )
     subprocess.run(
         ["sshpass", "-p", "expresso",
          "ssh", "-o", "StrictHostKeyChecking=no",
          "-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no",
-         f"expresso@{ip}", f"sudo bash /tmp/vr_undo.sh {backup}"],
+         f"expresso@{ip}", f"sudo bash /tmp/coldbrew_undo.sh {backup}"],
         check=True,
     )
     return 0
@@ -272,12 +272,12 @@ def cmd_probe(args: argparse.Namespace) -> int:
         tmp = f.name
     try:
         subprocess.run(
-            ["scp", "-o", "StrictHostKeyChecking=no", tmp, f"expresso@{args.bike}:/tmp/vr_probe.sh"],
+            ["scp", "-o", "StrictHostKeyChecking=no", tmp, f"expresso@{args.bike}:/tmp/coldbrew_probe.sh"],
             check=True, capture_output=True,
         )
         result = subprocess.run(
             ["ssh", "-o", "StrictHostKeyChecking=no",
-             f"expresso@{args.bike}", "bash /tmp/vr_probe.sh"],
+             f"expresso@{args.bike}", "bash /tmp/coldbrew_probe.sh"],
             capture_output=True, text=True, check=True,
         )
         data = json.loads(result.stdout)

@@ -161,7 +161,7 @@ class StageRunner:
             f.write(probe_script)
             tmp = f.name
         try:
-            result = _scp_and_run(self.ctx.bike_ip, tmp, "/tmp/vr_probe.sh")
+            result = _scp_and_run(self.ctx.bike_ip, tmp, "/tmp/coldbrew_probe.sh")
         finally:
             os.unlink(tmp)
 
@@ -185,10 +185,10 @@ class StageRunner:
         ip = self.ctx.bike_ip
 
         # rsync payload dir to bike
-        _rsync(str(PAYLOAD_DIR) + "/", f"{BIKE_USER}@{ip}:/tmp/vr_payload/")
+        _rsync(str(PAYLOAD_DIR) + "/", f"{BIKE_USER}@{ip}:/tmp/coldbrew_payload/")
         result = _ssh(
             ip,
-            "sudo bash /tmp/vr_payload/install-coldbrew.sh --live --with-hosts-block --with-watchdog --with-fake-server --with-branding",
+            "sudo bash /tmp/coldbrew_payload/install-coldbrew.sh --live --with-hosts-block --with-watchdog --with-fake-server --with-branding",
             timeout=300,
         )
         # capture backup path printed by installer

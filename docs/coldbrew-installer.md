@@ -51,7 +51,7 @@ Current mule behavior uses the new installer in live mode once it reaches SSH, s
 On the bike:
 
 ```bash
-sudo bash /tmp/vr_payload/recover-coldbrew.sh
+sudo bash /tmp/coldbrew_payload/recover-coldbrew.sh
 ```
 
 Or over SSH with mule helper:

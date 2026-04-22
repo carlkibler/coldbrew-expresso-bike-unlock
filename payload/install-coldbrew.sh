@@ -7,8 +7,8 @@ set -euo pipefail
 LIVE=false
 BUILD_DIR=""
 BACKUP_ROOT="/home/expresso/coldbrew_backups"
-WITH_HOSTS_BLOCK=false
-WITH_SSH_CONFIG=false
+WITH_HOSTS_BLOCK=true
+WITH_SSH_CONFIG=true
 WITH_WATCHDOG=false
 WITH_FAKE_SERVER=false
 WITH_BRANDING=false
@@ -23,9 +23,8 @@ Options:
   --live                 Apply changes. Without this, print the plan only.
   --build BUILD          Target build dir under /usr/local/expresso (auto-detect by default)
   --backup-root DIR      Backup root on bike (default: /home/expresso/coldbrew_backups)
-  --with-hosts-block     Install payload/etc/hosts to blackhole legacy servers
-                         and set TimeoutUserLoginSeconds=1 in ef_global.conf
-  --with-ssh-config      Install payload/etc/ssh/sshd_config (UseDNS no, no GSSAPI) and reload sshd
+  --no-hosts-block       Skip blackholing legacy servers in /etc/hosts (on by default)
+  --no-ssh-config        Skip sshd_config improvements (UseDNS no, no GSSAPI) (on by default)
   --with-watchdog        Install ef-watchdog scripts/config
   --with-fake-server     Install fake-server.sh
   --with-branding        Install coldbrew splash assets/script
@@ -46,8 +45,8 @@ while [ $# -gt 0 ]; do
     --live) LIVE=true ;;
     --build) BUILD_DIR="${2:?missing value for --build}"; shift ;;
     --backup-root) BACKUP_ROOT="${2:?missing value for --backup-root}"; shift ;;
-    --with-hosts-block) WITH_HOSTS_BLOCK=true ;;
-    --with-ssh-config) WITH_SSH_CONFIG=true ;;
+    --no-hosts-block) WITH_HOSTS_BLOCK=false ;;
+    --no-ssh-config) WITH_SSH_CONFIG=false ;;
     --with-watchdog) WITH_WATCHDOG=true ;;
     --with-fake-server) WITH_FAKE_SERVER=true ;;
     --with-branding) WITH_BRANDING=true ;;

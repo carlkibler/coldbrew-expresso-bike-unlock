@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${BIKE_TARGET:-}"
-REMOTE_PAYLOAD_DIR="/tmp/vr_payload"
+REMOTE_PAYLOAD_DIR="/tmp/coldbrew_payload"
 INSTALL_ARGS=()
 
 usage() {
