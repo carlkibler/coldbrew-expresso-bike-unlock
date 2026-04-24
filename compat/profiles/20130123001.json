@@ -1,0 +1,37 @@
+{
+  "build": "20130123001",
+  "expected_worlds": 44,
+  "bronze_worlds": [
+    "CityExpress",
+    "Thunderball",
+    "IronHorseRush",
+    "SundayAfternoon",
+    "MiniMayhem",
+    "DragonFire",
+    "Odyssey",
+    "RavensRoost",
+    "LostValley",
+    "FalconFlight",
+    "GrapeStomper",
+    "RabbitRun",
+    "CamelCountry"
+  ],
+  "steps": [
+    "world_availability",
+    "bike_subscription",
+    "global_functions",
+    "auto_skip_shell_start",
+    "auto_skip_shell_welcome",
+    "db_seed"
+  ],
+  "build_differences_vs_2018": {
+    "SetLevelGroupGUID": "absent — no route-group threshold gates, so Mechanism 4 comment-out is skipped",
+    "auto_skip": "required — pre-ride gatekeeper screens (shell_start.lua, shell_welcome.lua) must be bypassed; 2018 has this too but it's optional there",
+    "lua_constant_remap": "does NOT stick — LOGIN_TYPE_* constants re-registered on C++ side at runtime; function overrides in GlobalFunctions.lua must be used instead",
+    "ticker_lua_path": "ME_Assets/Scripts/Ticker.lua — same relative path as 2018 (unlock.sh uses BASE=ME_Assets, compatible)",
+    "ticker_structure": "identical to 2018 — same Init(), SetRandomMessage(), TSTable, SetNextAmbientTicker(), #TICKER_INROUTEUSER1-30 slots; ticker_append.lua works unchanged",
+    "worlds_dir": "ME_Assets/Worlds/ (44 worlds vs 60 in 2018)",
+    "cc_lua_variants": "cc_*.lua (CyberCycle) BRONZE variants present in Worlds/; installer patches those too"
+  },
+  "verified": true
+}

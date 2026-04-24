@@ -11,7 +11,7 @@ set -u
 SPLASH_DIR=/usr/local/expresso/coldbrew
 IDX_FILE="$SPLASH_DIR/.last-idx"
 LOG=/tmp/coldbrew-splash.log
-MAX_SECONDS=120
+MAX_SECONDS=300
 
 echo "[$(date +%H:%M:%S)] splash start (pid $$)" >> "$LOG"
 
@@ -77,7 +77,9 @@ while [ $i -lt $MAX_SECONDS ]; do
         exit 0
     fi
     # Inca's X window has no title; match by WM_CLASS instead.
-    if xdotool search --onlyvisible --class Inca >/dev/null 2>&1; then
+    # Do NOT use --onlyvisible: feh is fullscreen in front of Inca, so Inca's
+    # window would never pass the visibility check and the cap always fires.
+    if xdotool search --class Inca >/dev/null 2>&1; then
         echo "[$(date +%H:%M:%S)] Inca window detected at ${i}s, closing splash" >> "$LOG"
         exit 0
     fi
