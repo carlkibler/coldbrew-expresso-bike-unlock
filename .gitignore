@@ -13,6 +13,7 @@ __pycache__/
 
 # --- Local agent / editor state --------------------------------------------
 .claude/
+.codex/
 memory/
 .vscode/
 .idea/
