@@ -1,0 +1,84 @@
+#!/bin/sh
+# coldbrew rc.local for bike2 (build 20130123001)
+# Runs at end of boot. No set -e — one failure must not skip the rest.
+# All output goes to /var/log/rc-local.log for post-boot diagnosis.
+exec >/var/log/rc-local.log 2>&1
+set -x
+echo "=== rc.local start: $(date) ==="
+
+PUBKEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQD1Tf79cvWIEXY06x/MMKFDhvWsIHkJwlh0DF1riLkCejgr9r8khDHdcpiULu2HGzgkjp8OYegYYAnv/Nq92KH//U1d4g0SrmTAvQVtjunIoj+iXXFcIWdVPrDheA5Ef4RHs6C6RmSO1W9+3tOblE/sw+XGFQRYnry3mDMtwJdgKJmdou4PRBEsyLrqO86PlsKlLEaGXjfsfDANuEm0XtQe+lbbox3hhw9F42IAtW8J4Lg3FDb1Zkf+OJj+I+8izIn/tR6fXGism1YSWyWnIXRXcXKsiv40VSIwdTLPx9tZEMWhEboDgPC3yuNrt9/o1e0MolpgS4JpE2smF20+1UoWyX1M3tvpCneq9jqNiJM1z8g51GMYCD5jEIs4DU9wpoIL8yfs1KmT4m5nBqIpIBrH7oRzemZpZ66U/tb1wuxz8OCheXlvc1TCeQGZ8LeEH4iiVeenmsCv/cY8U0fFDF8Ml9jITNQ7At37EsGyzL5n60SzjbPKsRDvgwhYQ0xdWBdpYEeveCGEzZG9EkTpub2bqeskD3yP5TC8gcBk1xVtff7ym7VMnJmgUdKgi5usOxB0bs5fR8s1k+GD20xBHt11IV4+nLJbNwyOqkq4QCRTyVb3gi/EeJeCzua7Xz9ASj0OO/EsmfkfCav2S9BkNrS9jnBButNqRqZ2sm4kRd00LQ== carl@MacBook-Pro.lan"
+
+BUILD=20130123001
+EF_CONF=/usr/local/expresso/conf/ef_global.conf
+EF_GOLDEN=/usr/local/expresso/cold-brew/veloroot/ef_global.conf.golden
+EF_VER_FILE=/home/expresso/.expresso_master_version
+
+# ── Passwords ───────────────────────────────────────────────────────────────
+# 12.04 shadow entries can drift on some reboots.
+echo 'expresso:expresso' | chpasswd || true
+
+# ── authorized_keys ─────────────────────────────────────────────────────────
+mkdir -p /home/expresso/.ssh
+echo "$PUBKEY" > /home/expresso/.ssh/authorized_keys
+chmod 700 /home/expresso/.ssh
+chmod 600 /home/expresso/.ssh/authorized_keys
+chown -R expresso:expresso /home/expresso/.ssh
+
+# ── Version pin ─────────────────────────────────────────────────────────────
+# Pin the fallback version file so gnome-startup-custom.sh never falls back
+# to an old build when CLUtil has trouble reading ef_global.conf at boot.
+echo "EXPRESSO_MASTER_VERSION=$BUILD" > "$EF_VER_FILE"
+chown expresso:expresso "$EF_VER_FILE"
+
+# ── ef_global.conf integrity check ──────────────────────────────────────────
+# Dispenser does a mid-write truncation of ef_global.conf during early boot.
+# If CLUtil reads a truncated file it returns "unknown" → wrong build launches.
+# Guard: restore from golden if the file is missing, < 20 lines (truncated),
+# or lacks our required Version key.
+CONF_LINES=$(wc -l < "$EF_CONF" 2>/dev/null || echo 0)
+if [ "$CONF_LINES" -lt 20 ] || ! grep -q "^Version = $BUILD" "$EF_CONF" 2>/dev/null; then
+    if [ -f "$EF_GOLDEN" ]; then
+        cp "$EF_GOLDEN" "$EF_CONF"
+        chown expresso:expresso "$EF_CONF"
+        echo "restored ef_global.conf from golden (was $CONF_LINES lines)"
+    else
+        echo "WARNING: ef_global.conf looks wrong but no golden backup found"
+    fi
+fi
+
+# ── GlobalFunctions.lua integrity check ─────────────────────────────────────
+GF_ACTIVE=/usr/local/expresso/$BUILD/ME_Assets/Scripts/GlobalFunctions.lua
+GF_GOLDEN=/usr/local/expresso/cold-brew/veloroot/GlobalFunctions.lua.golden
+if [ -f "$GF_GOLDEN" ] && [ -f "$GF_ACTIVE" ]; then
+    if ! grep -q 'coldbrew:auth-v2' "$GF_ACTIVE"; then
+        cp "$GF_GOLDEN" "$GF_ACTIVE"
+        chown expresso:expresso "$GF_ACTIVE"
+        echo "restored GlobalFunctions.lua from golden"
+    fi
+fi
+
+# ── World unlock re-patch ────────────────────────────────────────────────────
+# Idempotent sed — no-op if already patched.
+for W in CityExpress Thunderball IronHorseRush SundayAfternoon MiniMayhem \
+         DragonFire Odyssey RavensRoost LostValley FalconFlight \
+         GrapeStomper RabbitRun CamelCountry; do
+    D=/usr/local/expresso/$BUILD/ME_Assets/Worlds/$W
+    [ -d "$D" ] || continue
+    for f in "$D"/*.lua; do
+        [ -f "$f" ] || continue
+        if grep -q LEVEL_AVAILABILITY_BRONZE "$f" 2>/dev/null; then
+            sed -i 's/LEVEL_AVAILABILITY_BRONZE/LEVEL_AVAILABILITY_ALL/g' "$f"
+            echo "re-patched BRONZE→ALL in $f"
+        fi
+    done
+done
+
+# ── ef-watchdog ─────────────────────────────────────────────────────────────
+# The game rewrites ef_global.conf ~40s after boot. Upstart starts the watchdog
+# at runlevel 2 and respawns it. Belt-and-suspenders kick here in case upstart
+# missed the event (e.g. if the conf file was not yet present at runlevel 2).
+initctl status ef-watchdog 2>/dev/null | grep -q 'start/running' || \
+    initctl start ef-watchdog 2>/dev/null || true
+
+echo "=== rc.local end: $(date) ==="
+exit 0
