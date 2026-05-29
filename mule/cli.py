@@ -3,14 +3,16 @@
 coldbrew-mule — Expresso HD auto-unlock orchestrator CLI
 
 Usage:
-  coldbrew-mule discover [--subnet CIDR]  # find Expresso HD bikes on the network
-  coldbrew-mule run   [options]           # full 7-stage pipeline
-  coldbrew-mule undo  --bike IP          # restore latest backup via SSH
-  coldbrew-mule hid-test --port DEV      # smoke-test the CH9329 dongle
-  coldbrew-mule probe --bike IP          # run probe.sh and print results
+  coldbrew-mule discover [--subnet CIDR]              # find Expresso HD bikes on the network
+  coldbrew-mule run   [options]                       # full 7-stage pipeline
+  coldbrew-mule undo  --bike IP                       # restore latest backup via SSH
+  coldbrew-mule hid-test [--port DEV]                 # smoke-test the CH9329 dongle
+  coldbrew-mule bootstrap --wifi-ssid S --wifi-pass P # open xterm, set WiFi, reset SSH password
+  coldbrew-mule type --text "..." [--no-enter]        # type arbitrary text via HID
+  coldbrew-mule probe --bike IP                       # run probe.sh and print results
 
 Options:
-  --hid-port DEV        CH9329 serial device [default: /dev/ttyUSB2]
+  --hid-port DEV        CH9329 serial device [default: auto-detect]
   --bike IP             skip stages 0-3, connect directly to this IP
   --wifi-ssid SSID      SSID for the mule's access point
   --wifi-pass PASS      WiFi passphrase
@@ -30,9 +32,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+import glob
+import platform
+
 import serial
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+HID_SCRIPTS = REPO_ROOT / "mule" / "hid" / "scripts"
+
+
+def _auto_hid_port() -> str:
+    if platform.system() == "Darwin":
+        candidates = sorted(glob.glob("/dev/cu.usbserial-*"))
+        if candidates:
+            return candidates[0]
+    return "/dev/ttyUSB2"
 
 # Fingerprint check run over SSH to confirm a host is an Expresso HD bike
 _FINGERPRINT_CMD = (
@@ -244,19 +258,49 @@ def cmd_undo(args: argparse.Namespace) -> int:
 
 
 def cmd_hid_test(args: argparse.Namespace) -> int:
-    if not args.port:
-        print("--port required", file=sys.stderr)
-        return 1
     from mule.hid import ch9329
-    print(f"Opening {args.port}...")
-    port = ch9329.open_port(args.port)
+    import time
+    port_path = args.port or _auto_hid_port()
+    print(f"Opening {port_path}...")
+    port = ch9329.open_port(port_path)
     print("Sending Alt+F2...")
     ch9329.alt_f2(port)
-    import time; time.sleep(1.2)
+    time.sleep(1.2)
     print("Typing 'xterm'...")
     ch9329.type_string(port, "xterm")
     ch9329.press_enter(port)
     print("Done — check bike screen for xterm window.")
+    port.close()
+    return 0
+
+
+def cmd_bootstrap(args: argparse.Namespace) -> int:
+    if not args.wifi_ssid:
+        print("--wifi-ssid required", file=sys.stderr)
+        return 1
+    from mule.hid import ch9329
+    from mule.orchestrator import _run_hid_script
+    port_path = args.port or _auto_hid_port()
+    new_pass = args.new_passwd or "expresso"
+    print(f"Bootstrap via {port_path}")
+    print(f"  WiFi SSID : {args.wifi_ssid}")
+    print(f"  New passwd: {'(same as current)' if new_pass == 'expresso' else '(custom)'}")
+    port = ch9329.open_port(port_path)
+    script = (HID_SCRIPTS / "bootstrap.txt").read_text()
+    subs = {"SSID": args.wifi_ssid, "PASS": args.wifi_pass or "", "NEW_PASS": new_pass}
+    _run_hid_script(port, script, subs)
+    port.close()
+    print("\nDone. Give it ~30s then: ssh expresso@<bike-ip>")
+    return 0
+
+
+def cmd_type(args: argparse.Namespace) -> int:
+    from mule.hid import ch9329
+    port_path = args.port or _auto_hid_port()
+    port = ch9329.open_port(port_path)
+    ch9329.type_string(port, args.text)
+    if not args.no_enter:
+        ch9329.press_enter(port)
     port.close()
     return 0
 
@@ -289,7 +333,7 @@ def cmd_probe(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="coldbrew-mule", description=__doc__)
-    parser.add_argument("--hid-port", default="/dev/ttyUSB2")
+    parser.add_argument("--hid-port", default=None, help=f"CH9329 serial device [default: auto-detect, currently {_auto_hid_port()}]")
     parser.add_argument("--bike")
     parser.add_argument("--wifi-ssid")
     parser.add_argument("--wifi-pass", default="")
@@ -300,7 +344,21 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("run")
     sub.add_parser("undo")
-    sub.add_parser("hid-test").add_argument("--port")
+
+    hid_test_p = sub.add_parser("hid-test")
+    hid_test_p.add_argument("--port", help="serial device override")
+
+    bootstrap_p = sub.add_parser("bootstrap", help="open xterm, set WiFi, reset SSH password")
+    bootstrap_p.add_argument("--wifi-ssid", required=True)
+    bootstrap_p.add_argument("--wifi-pass", default="")
+    bootstrap_p.add_argument("--new-passwd", default="expresso", help="new expresso user password [default: expresso]")
+    bootstrap_p.add_argument("--port", help="serial device override")
+
+    type_p = sub.add_parser("type", help="type arbitrary text via HID keyboard")
+    type_p.add_argument("--text", required=True, help="text to type")
+    type_p.add_argument("--no-enter", action="store_true", help="don't press Enter after typing")
+    type_p.add_argument("--port", help="serial device override")
+
     sub.add_parser("probe")
     discover_p = sub.add_parser("discover")
     discover_p.add_argument("--subnet", help="CIDR to scan, e.g. 192.168.1.0/24 (default: all local /24s)")
@@ -311,6 +369,8 @@ def main() -> int:
         "run": cmd_run,
         "undo": cmd_undo,
         "hid-test": cmd_hid_test,
+        "bootstrap": cmd_bootstrap,
+        "type": cmd_type,
         "probe": cmd_probe,
         "discover": cmd_discover,
         None: lambda a: (parser.print_help(), 1)[1],

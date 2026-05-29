@@ -96,16 +96,20 @@ def _build_char_map() -> None:
 _build_char_map()
 
 
+_HEADER = bytes([0x57, 0xAB])
+
+
 def _make_packet(hid_usage: int, mod: int = MOD_NONE) -> bytes:
-    payload = [0x00, 0x02, 0x08, mod, 0x00, hid_usage, 0x00, 0x00, 0x00, 0x00, 0x00]
-    checksum = sum(payload) & 0xFF
-    return bytes([0x57, 0xAB] + payload + [checksum])
+    # CH9329 V1.8: checksum covers header + payload bytes
+    body = bytes([0x00, 0x02, 0x08, mod, 0x00, hid_usage, 0x00, 0x00, 0x00, 0x00, 0x00])
+    checksum = sum(_HEADER + body) & 0xFF
+    return _HEADER + body + bytes([checksum])
 
 
 def _release_packet() -> bytes:
-    payload = [0x00, 0x02, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-    checksum = sum(payload) & 0xFF
-    return bytes([0x57, 0xAB] + payload + [checksum])
+    body = bytes([0x00, 0x02, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+    checksum = sum(_HEADER + body) & 0xFF
+    return _HEADER + body + bytes([checksum])
 
 
 def open_port(dev: str = "/dev/ttyUSB0") -> serial.Serial:

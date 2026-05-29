@@ -1,0 +1,11 @@
+# Bootstrap: open xterm, connect WiFi via native mechanism, set SSH password.
+# Placeholders: {SSID}, {PASS}, {NEW_PASS} substituted by cli.py at runtime.
+
+ALT_F2
+WAIT 1200
+TYPE xterm
+WAIT 2000
+TYPE SSID={SSID} PSK={PASS} bash ~/script/start-wireless-networking.sh
+WAIT 20000
+TYPE echo 'expresso:{NEW_PASS}' | sudo chpasswd && echo PASSWD_OK
+WAIT 2000
