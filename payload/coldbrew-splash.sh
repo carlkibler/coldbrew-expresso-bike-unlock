@@ -4,7 +4,7 @@
 # between plymouth exit and Inca's game window appearing.
 #
 # Ubuntu 12.04 has no python3/pygame; feh is already installed.
-# Exits when xdotool finds Inca's X window, or after MAX_SECONDS as a cap.
+# Exits when Inca's X window appears (via xwininfo), or after MAX_SECONDS as a cap.
 
 set -u
 
@@ -76,10 +76,10 @@ while [ $i -lt $MAX_SECONDS ]; do
         echo "[$(date +%H:%M:%S)] feh exited on its own" >> "$LOG"
         exit 0
     fi
-    # Inca's X window has no title; match by WM_CLASS instead.
-    # Do NOT use --onlyvisible: feh is fullscreen in front of Inca, so Inca's
-    # window would never pass the visibility check and the cap always fires.
-    if xdotool search --class Inca >/dev/null 2>&1; then
+    # Detect Inca's X window via xwininfo (xdotool unavailable on Ubuntu 12.04
+    # — the precise archive packages are 404). xwininfo -root -tree lists all
+    # windows with their WM_CLASS; Inca registers as ("Inca" "Inca").
+    if xwininfo -root -tree 2>/dev/null | grep -q '"Inca"'; then
         echo "[$(date +%H:%M:%S)] Inca window detected at ${i}s, closing splash" >> "$LOG"
         exit 0
     fi
