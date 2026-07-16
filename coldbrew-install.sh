@@ -8,6 +8,14 @@ REPO="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${BIKE_TARGET:-}"
 REMOTE_PAYLOAD_DIR="/tmp/coldbrew_payload"
 INSTALL_ARGS=()
+SSH_OPTS=(
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o HostKeyAlgorithms=+ssh-rsa
+  -o PubkeyAcceptedAlgorithms=+ssh-rsa
+  -o LogLevel=ERROR
+)
+printf -v RSYNC_RSH '%q ' ssh "${SSH_OPTS[@]}"
 
 usage() {
   cat <<'EOF'
@@ -44,11 +52,11 @@ done
 
 [ -n "$TARGET" ] || { usage >&2; exit 1; }
 
-rsync -az --delete -e "ssh -o StrictHostKeyChecking=no" \
+rsync -az --delete -e "$RSYNC_RSH" \
   "$REPO/payload/" "$TARGET:$REMOTE_PAYLOAD_DIR/"
 
 REMOTE_CMD=(sudo bash "$REMOTE_PAYLOAD_DIR/install-coldbrew.sh")
 REMOTE_CMD+=("${INSTALL_ARGS[@]}")
 
-ssh -o StrictHostKeyChecking=no "$TARGET" \
+ssh "${SSH_OPTS[@]}" "$TARGET" \
   "$(printf '%q ' "${REMOTE_CMD[@]}")"

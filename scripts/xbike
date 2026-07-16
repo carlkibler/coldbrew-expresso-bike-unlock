@@ -15,7 +15,10 @@ set -o pipefail
 BIKE_USER="${BIKE_USER:-expresso}"
 BIKE_HOST="${BIKE_HOST:-192.168.1.100}"
 BIKE_PW="${BIKE_PW:-expresso}"
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=8 -o LogLevel=ERROR"
+# Expresso bikes are on DHCP and we don't pin their host keys — ignore them
+# entirely (no prompts, no "IDENTIFICATION CHANGED" blocks on IP reuse). The
+# old 12.04 sshd only speaks ssh-rsa, so force those algos too.
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o CheckHostIP=no -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -o ConnectTimeout=8 -o LogLevel=ERROR"
 
 # Pick auth: bike alias (key) if it works on the default host, else sshpass.
 # If BIKE_HOST is overridden via env, skip the alias and go straight to sshpass.
@@ -24,8 +27,14 @@ if [[ "$BIKE_HOST" == "192.168.1.100" ]] && ssh -o BatchMode=yes -o ConnectTimeo
     SCP_CMD=(scp)
     SCP_TGT="bike"
 else
-    SSH_CMD=(sshpass -p "$BIKE_PW" ssh $SSH_OPTS -o PreferredAuthentications=password -o PubkeyAuthentication=no "${BIKE_USER}@${BIKE_HOST}")
-    SCP_CMD=(sshpass -p "$BIKE_PW" scp $SSH_OPTS -o PreferredAuthentications=password -o PubkeyAuthentication=no)
+    if command -v sshpass >/dev/null 2>&1; then
+        SSH_CMD=(sshpass -p "$BIKE_PW" ssh $SSH_OPTS -o PreferredAuthentications=password -o PubkeyAuthentication=no "${BIKE_USER}@${BIKE_HOST}")
+        SCP_CMD=(sshpass -p "$BIKE_PW" scp $SSH_OPTS -o PreferredAuthentications=password -o PubkeyAuthentication=no)
+    else
+        # Stay usable on a clean laptop: OpenSSH will prompt for the stock password.
+        SSH_CMD=(ssh $SSH_OPTS "${BIKE_USER}@${BIKE_HOST}")
+        SCP_CMD=(scp $SSH_OPTS)
+    fi
     SCP_TGT="${BIKE_USER}@${BIKE_HOST}"
 fi
 

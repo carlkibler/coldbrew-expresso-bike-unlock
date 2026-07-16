@@ -129,7 +129,12 @@ The installer:
 4. applies the unlock mechanisms for the detected build vintage (2013 or 2018)
 5. optionally installs branding, watchdog, fake-server helpers
 
-To uninstall: `payload/recover-coldbrew.sh` restores every backup in reverse order.
+To uninstall, run the recovery script on the bike. It restores the newest backup by default:
+
+```bash
+BIKE_HOST=192.168.1.100 ./scripts/xbike --root \
+  'bash /tmp/coldbrew_payload/recover-coldbrew.sh'
+```
 
 ### Poke at a bike interactively
 

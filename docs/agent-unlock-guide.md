@@ -22,9 +22,9 @@ the internet once it's done.
 
 Two build vintages are fully documented and automated: **2013** (`20130123001`)
 and **2018** (`20180514001`). A model this repo hasn't seen yet — for example
-an **Expresso Go** — is almost certainly the same software stack with different
-paths or a different version string. The unlock mechanisms are the same; you
-just find where they live on this bike. Phase 4 is how.
+an **Expresso Go** — may share this software stack, but do not assume it does.
+Fingerprint it read-only first. Reuse only the mechanisms whose targets and
+behavior you can verify. Phase 4 is how.
 
 ---
 
@@ -33,11 +33,12 @@ just find where they live on this bike. Phase 4 is how.
 - **Dry-run before live.** `coldbrew-install.sh` defaults to a dry run. Only add
   `--live` after the dry-run output looks right and you've told the human what
   it will change.
-- **The installer backs up every file it touches** to
-  `/home/expresso/coldbrew_backups/`, and `payload/recover-coldbrew.sh` restores
-  them in reverse. Editing Lua/config is reversible. Reassure the human of this.
-- **You cannot brick the bike by editing Lua or config.** You *can* lock the
-  human out by breaking boot or networking. So until SSH from the laptop is
+- **A live install backs up existing files before changing them** under
+  `/home/expresso/coldbrew_backups/`. `payload/recover-coldbrew.sh` restores the
+  latest backup by default. A dry run creates no backup and changes nothing.
+- Lua/config edits are normally recoverable, but never promise that a machine
+  cannot be damaged or made unbootable. You can lock the human out by breaking
+  boot or networking. So until SSH from the laptop is
   confirmed working (end of Phase 2), **do not** touch boot scripts, `/etc/`
   networking, sshd, or `rc.local`, and **keep the USB keyboard plugged into the
   bike** as the recovery path.
@@ -100,30 +101,16 @@ GHz, re-run the script. Ping the IP from the laptop to confirm reachability.
 
 ## Phase 2 — Reach the bike from the laptop (SSH)
 
-The bike runs an ancient OpenSSH (5.9). Modern clients (OpenSSH 9.x) refuse its
-key algorithms by default, so add these flags. Put this in the human's
-`~/.ssh/config` (create it if needed):
+The bike runs an ancient OpenSSH (5.9). Modern clients may reject its key
+algorithms. Prefer this repo's wrapper, which supplies the compatibility flags
+and does not permanently weaken the human's SSH configuration. If `sshpass` is installed the wrapper supplies the stock password; otherwise
+OpenSSH prompts for it. Run:
 
-```
-Host bike
-  HostName 192.168.1.100
-  User expresso
-  PubkeyAcceptedAlgorithms +ssh-rsa
-  HostKeyAlgorithms +ssh-rsa
-  LogLevel ERROR
-```
-
-Login is `expresso` / password `expresso` (stock). Test:
+Login is `expresso` / password `expresso` (stock). Do not paste the WiFi
+password, other credentials, or unrelated private data into chat or reports.
 
 ```bash
-ssh bike 'echo connected && id'
-```
-
-This repo ships a wrapper that handles all of the above and adds a password
-fallback and file push/pull — **prefer it for everything from here on**:
-
-```bash
-BIKE_HOST=192.168.1.100 ./scripts/xbike 'echo connected'
+BIKE_HOST=192.168.1.100 ./scripts/xbike 'echo connected && id'
 BIKE_HOST=192.168.1.100 ./scripts/xbike --root 'cat /etc/hosts'
 BIKE_HOST=192.168.1.100 ./scripts/xbike --put local.sh /tmp/remote.sh
 ```
@@ -152,7 +139,7 @@ Key things to establish, and where they live:
 | Question | How to check |
 |---|---|
 | Build version string | `grep -i Version /usr/local/expresso/conf/ef_global.conf`, and the 11-digit dir under `/usr/local/expresso/` |
-| Does it match a known profile? | Compare the build string to `compat/profiles/*.json` filenames (`20130123001`, `20180514001`) |
+| Does it match a known profile? | Compare the build string to `compat/profiles/*.json` filenames (`20130123001`, `20180514001`). Profiles are reference evidence; the installer does not currently consume them |
 | Where's the game content? | `ls /usr/local/expresso/<build>/ME_Assets/` — `Worlds/`, `Scripts/` |
 | How many worlds, which are locked? | probe's `worlds` and `bronze_worlds_remaining` |
 | Are the login-gate screens present? | `ls …/ME_Assets/Scripts/ | grep -i 'shell_start\|shell_welcome\|GlobalFunctions'` |
@@ -174,27 +161,34 @@ You're done thinking. Run the installer from the laptop. Dry-run first:
 ./coldbrew-install.sh --target expresso@192.168.1.100
 ```
 
-Read the output to the human. If it looks right, go live (branding is optional
-but nice — it replaces the dead-cloud boot screen):
+Check that the output names the expected build and paths, reports a backup plan,
+and has no missing-file or layout errors. Explain the planned changes, then go
+live. Branding is optional and changes the boot splash:
 
 ```bash
 ./coldbrew-install.sh --target expresso@192.168.1.100 --live --with-branding
 ```
 
-The installer auto-detects 2013 vs 2018, backs up everything, applies the right
-mechanisms, and restarts the game. Re-running is safe and idempotent. If the
-cloud DNS somehow still resolves, add `--with-hosts-block`. Skip to Phase 5.
+The installer auto-detects the build layout, backs up existing targets, applies
+the unlock, blackholes the retired cloud hosts, adjusts sshd, and restarts the
+game. Those last two changes are defaults; use `--no-hosts-block` or
+`--no-ssh-config` only for a specific reason. Re-running is intended to be
+idempotent. Skip to Phase 5.
 
 ### Case B: an undocumented model (Expresso Go, or any build not in `compat/profiles/`)
 
-The stack is the same; the unlock is the same seven mechanisms. Your job is to
-find each mechanism's target on **this** bike and apply it, verifying as you go.
-The installer's logic lives in `payload/unlock.sh` and the Lua override blocks
-in `payload/patches/` — read them; they are your reference for exactly what
-each edit looks like.
+Do not assume the stack or all seven mechanisms are the same. Keep this phase
+read-only until you have mapped the layout and compared the actual Lua functions
+with `payload/unlock.sh` and `payload/patches/`. Save the complete probe output
+locally before changing anything.
 
-Work mechanism by mechanism. After each, take a backup of the file first
-(`cp -f file file.coldbrew-bak`) or let the installer do it.
+If the known installer dry run recognizes the same required files and its plan
+matches what you observed, prefer adapting the installer locally over typing
+one-off mutations on the bike. Add explicit layout checks, preserve its
+timestamped backup/recovery path, run shell syntax checks, then dry-run again.
+Only use `--allow-unknown-build` after those checks; the flag relaxes a guard, it
+does not prove compatibility. Apply one mechanism at a time and verify it before
+continuing.
 
 | # | Mechanism | What it does | Find it on a new model by… | Verify |
 |---|---|---|---|---|
@@ -221,9 +215,9 @@ script names), the mechanisms still map one-to-one — adjust the paths, keep th
 edits. If a mechanism has no target on this bike (e.g. no `SetLevelGroupGUID`),
 note that it's absent and move on; absence is data for the report.
 
-Once you can hand-apply the mechanisms, if the layout is close enough you can
-often point the real installer at the bike and let it do the mechanical work.
-Prefer that once you understand the differences.
+Do not leave the successful path as an unrepeatable series of shell edits. Put
+the model-specific layout checks into the installer or a reviewed adapter, then
+exercise dry run, live install, verification, and recovery.
 
 ---
 
@@ -301,7 +295,7 @@ ones. Fill every field from your probe output and what you actually did:
 
 ## Probe output
 ```json
-<paste the full compat/probe.sh JSON>
+<paste the compat/probe.sh JSON; redact the full serial unless the owner explicitly wants it published>
 ```
 ```
 
