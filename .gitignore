@@ -42,8 +42,3 @@ Thumbs.db
 *.bak
 *.tmp
 .ipynb_checkpoints/
-
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
-.beads-credential-key

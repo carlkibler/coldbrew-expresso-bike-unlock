@@ -22,53 +22,92 @@ Notes:
 
 ## Quick start
 
-The easiest thing is to give any AI (Claude, Codex, etc) this repo and ask them to help you through it. With the instructions
-and scripts, they can absolutely navigate it and handle any irregularities and mistakes. 
+**Not technical? Let an AI do it.** The easiest path by far: open this repo in
+any AI coding assistant (Claude Code, Codex, Cursor, etc.) and ask it to help.
+The assistant reads the built-in runbook and walks you through every step,
+adapting to your exact bike and fixing mistakes as they come up.
 
-Suggested prompt:
+Paste this to your AI assistant to start:
 
 ```
-Help me unlock my Expresso HD bike, starting from getting on wifi. Adapt install scripts as needed for 
-my particularly hardware.
+Help me unlock my Expresso bike. Read docs/agent-unlock-guide.md and walk me
+through it, starting from getting the bike on WiFi. My bike model is: <what the
+sticker or screen says>.
 ```
+
+> **🤖 AI agents:** read [`docs/agent-unlock-guide.md`](docs/agent-unlock-guide.md)
+> **now** before doing anything. It is the full runbook — including how to
+> handle a bike model this repo hasn't documented yet (probe it, adapt the
+> unlock, and send a report back so the next person has it easy).
+
+Prefer to do it by hand? The three steps below are the whole job.
 
 ### Step 1: Get the bike online
 
-The bike needs to be online with an IP address, then use a computer to run the installer. Wifi is easiest, 
-you just need a USB keyboard to edit 1 config file and run a script.
+The installer runs from your laptop and talks to the bike over the network, so
+first the bike needs an IP address on the same network as your laptop.
 
-1. With the bike started up, plug in a USB keyboard
-2. Press **Alt+F2** and you'll see a small window on screen for "Run Application". Type `xterm`.
+**Easiest option — plug in an Ethernet cable.** If the bike has a wired network
+port and you can run a cable to your router, do that. It gets an IP
+automatically and you can skip the WiFi editing entirely. Jump to "Find the
+bike's IP" below.
 
-In the xterm, open the global config in a text editor. Like GEdit or vi:
+**WiFi option.** You'll need a **USB keyboard** plugged into the bike. You edit
+one config file and run one script. It must be a **2.4 GHz** network — these
+bikes do not do 5 GHz.
+
+1. With the bike powered on, plug the USB keyboard into any USB port on it.
+2. Press **Alt+F2**. A small "Run Application" box appears on the bike's screen.
+   Type `xterm` and press **Enter**. A black terminal window opens.
+3. In that terminal, open the config file in a text editor:
+
+   ```bash
+   gedit /usr/local/expresso/conf/ef_global.conf
+   ```
+
+   If `gedit` gives an error, try `nano` instead:
+   `nano /usr/local/expresso/conf/ef_global.conf`
+
+4. Find the two `Wireless…` lines (or add them at the bottom if missing). Set
+   them to your network — plain text, **no quotes**:
+
+   ```
+   WirelessSSID = YourNetworkName
+   WirelessPassword = YourNetworkPassword
+   ```
+
+   Capitalization matters for both the name and password. If a line starts with
+   `#`, delete the `#`.
+
+5. Save the file.
+   - In **gedit**: **Ctrl+S** to save, then close the window.
+   - In **nano**: **Ctrl+O** then **Enter** to save, then **Ctrl+X** to exit.
+
+6. Back in the terminal, turn on WiFi with the bike's built-in script:
+
+   ```bash
+   ~/script/start-wireless-networking.sh
+   ```
+
+**Find the bike's IP.** Wait about 15 seconds, then run:
 
 ```bash
-gedit /usr/local/expresso/conf/ef_global.conf
+ip addr show wlan0     # WiFi
+ip addr show eth0      # or this, if you used an Ethernet cable
 ```
 
-Add or update these two lines (values are plain text — no quotes). It must be a 2.4 GHz network!
+Look for the line starting with `inet` — the number after it (e.g.
+`192.168.1.100`) is the bike's IP address. Write it down; you'll use it in
+Step 2. Everywhere a command below shows `192.168.1.100`, type your bike's IP
+instead.
 
-```
-WirelessSSID = YourNetworkName
-WirelessPassword = YourNetworkPassword
-```
-
-Save with **Ctrl+S**, then close with **Ctrl+W**.
-
-Then bring up WiFi with the stock Expresso script:
-
-```bash
-~/script/start-wireless-networking.sh
-```
-
-Give it a few seconds, then confirm you have an IP:
-
-```bash
-ip addr show wlan0
-```
-
-Note the `inet` address — you'll pass it to the installer in the next step. Where is says "192.168.1.100" in 
-commands, put in that IP address.
+> **Keep the USB keyboard plugged in** until Step 2 confirms you can reach the
+> bike from your laptop. If the network doesn't come up, the keyboard is your
+> only way back in.
+>
+> **No IP after a minute?** Double-check the SSID/password spelling and that the
+> network is 2.4 GHz, then re-run `~/script/start-wireless-networking.sh`. Your
+> AI assistant can diagnose from here.
 
 ---
 
@@ -117,9 +156,11 @@ BIKE_HOST=192.168.1.101 ./scripts/xbike uptime     # target another bike
 ├── pyproject.toml          # Python project: mule/
 │
 ├── docs/                   # project write-ups
+│   ├── agent-unlock-guide.md  # step-by-step runbook for an AI assistant
 │   ├── research.md         # RE dossier (what was found, how)
 │   ├── coldbrew-installer.md
 │   ├── deferred-ghosts.md
+│   ├── models/             # per-model reports (sent back by users)
 │   └── images/
 │
 ├── scripts/                # helper shell scripts
